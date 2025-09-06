@@ -117,6 +117,16 @@ function loadDiscordConfig(): DiscordConfig {
     webhookUrl,
     defaultUsername: process.env.DISCORD_DEFAULT_USERNAME,
     defaultAvatarUrl: process.env.DISCORD_DEFAULT_AVATAR_URL,
+    testTitle: process.env.DISCORD_TEST_TITLE,
+    testMessage: process.env.DISCORD_TEST_MESSAGE,
+    testFooter: process.env.DISCORD_TEST_FOOTER,
+    enableThreading: process.env.DISCORD_ENABLE_THREADING === "true",
+    threadPrefix: process.env.DISCORD_THREAD_PREFIX,
+    isForumChannel: process.env.DISCORD_FORUM_CHANNEL === "true",
+    threadNameMaxLength: parseInt(
+      process.env.DISCORD_THREAD_NAME_MAX_LENGTH || "80",
+      10,
+    ),
   };
 }
 

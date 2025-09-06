@@ -103,6 +103,15 @@ export class DiscordService {
         embeds: [embed],
       };
 
+      // Add threading support if enabled and using forum channel
+      if (this.config.enableThreading && this.config.isForumChannel) {
+        payload.thread_name = this.generateThreadName(post);
+        logger.debug("Creating Discord thread for Reddit post", {
+          postId: post.id,
+          threadName: payload.thread_name,
+        });
+      }
+
       const result = await this.sendWithRetry(payload);
 
       if (result.success) {
@@ -452,13 +461,16 @@ export class DiscordService {
         avatar_url: this.config.defaultAvatarUrl,
         embeds: [
           {
-            title: "🧪 Test Connection",
+            title: this.config.testTitle || "🏝️ G'day Tassie!",
             description:
-              "This is a test message to verify the Discord webhook is working correctly.",
-            color: DISCORD_COLORS.DEFAULT,
+              this.config.testMessage ||
+              "Your friendly Reddit bot is now connected and ready to share the latest happenings from r/tasmania! I'll keep you updated with interesting posts from our beautiful island community. 🦘",
+            color: DISCORD_COLORS.ANNOUNCEMENT,
             timestamp: new Date().toISOString(),
             footer: {
-              text: "Tassie Reddit Bot - Connection Test",
+              text:
+                this.config.testFooter ||
+                "Ready to share Tasmania's stories with you!",
             },
           },
         ],
@@ -492,5 +504,47 @@ export class DiscordService {
         error: botError,
       };
     }
+  }
+
+  /**
+   * Generate a thread name from a Reddit post
+   * Formats the title according to Discord's thread naming requirements
+   *
+   * @param post - Reddit post to generate thread name for
+   * @returns Formatted thread name
+   * @private
+   */
+  private generateThreadName(post: RedditPost): string {
+    let threadName = "";
+
+    // Add prefix if configured
+    if (this.config.threadPrefix) {
+      threadName += this.config.threadPrefix;
+    }
+
+    // Add flair if available
+    if (post.link_flair_text) {
+      threadName += `[${post.link_flair_text}] `;
+    }
+
+    // Add the post title
+    threadName += post.title;
+
+    // Add author for context
+    threadName += ` (by u/${post.author})`;
+
+    // Truncate to Discord's thread name limit
+    const maxLength = this.config.threadNameMaxLength || 80;
+    if (threadName.length > maxLength) {
+      threadName = threadName.substring(0, maxLength - 3) + "...";
+    }
+
+    // Clean up any characters that might cause issues
+    threadName = threadName
+      .replace(/\n/g, " ") // Replace newlines with spaces
+      .replace(/\s+/g, " ") // Replace multiple spaces with single space
+      .trim();
+
+    return threadName;
   }
 }

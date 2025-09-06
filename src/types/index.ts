@@ -122,6 +122,8 @@ export interface DiscordWebhookPayload {
   embeds?: DiscordEmbed[];
   /** Whether this is a TTS message */
   tts?: boolean;
+  /** Thread name for forum channels (creates new thread) */
+  thread_name?: string;
 }
 
 /**
@@ -158,6 +160,20 @@ export interface DiscordConfig {
   defaultUsername?: string;
   /** Default avatar URL for webhook messages */
   defaultAvatarUrl?: string;
+  /** Custom test message title */
+  testTitle?: string;
+  /** Custom test message description */
+  testMessage?: string;
+  /** Custom test message footer */
+  testFooter?: string;
+  /** Enable automatic thread creation for each post */
+  enableThreading?: boolean;
+  /** Prefix to add to thread names */
+  threadPrefix?: string;
+  /** Whether the Discord channel is a Forum Channel */
+  isForumChannel?: boolean;
+  /** Maximum length for thread names */
+  threadNameMaxLength?: number;
 }
 
 /**
