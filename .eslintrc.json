@@ -1,0 +1,230 @@
+{
+  "root": true,
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module",
+    "project": "./tsconfig.json"
+  },
+  "env": {
+    "node": true,
+    "es2022": true,
+    "jest": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "@typescript-eslint/recommended",
+    "@typescript-eslint/recommended-requiring-type-checking",
+    "prettier"
+  ],
+  "plugins": ["@typescript-eslint", "prettier"],
+  "rules": {
+    // =============================================================================
+    // PRETTIER INTEGRATION
+    // =============================================================================
+    "prettier/prettier": "error",
+
+    // =============================================================================
+    // TYPESCRIPT-SPECIFIC RULES (STRICT)
+    // =============================================================================
+    // FORBIDDEN: No 'any' type - use specific types or generics
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/no-unsafe-any": "error",
+    "@typescript-eslint/no-unsafe-assignment": "error",
+    "@typescript-eslint/no-unsafe-call": "error",
+    "@typescript-eslint/no-unsafe-member-access": "error",
+    "@typescript-eslint/no-unsafe-return": "error",
+
+    // Require explicit return types on exported functions
+    "@typescript-eslint/explicit-function-return-type": [
+      "error",
+      {
+        "allowExpressions": true,
+        "allowTypedFunctionExpressions": true,
+        "allowHigherOrderFunctions": true,
+        "allowDirectConstAssertionInArrowFunctions": true
+      }
+    ],
+
+    // Require explicit types for module boundaries
+    "@typescript-eslint/explicit-module-boundary-types": "error",
+
+    // Strict null checks
+    "@typescript-eslint/no-non-null-assertion": "error",
+    "@typescript-eslint/prefer-nullish-coalescing": "error",
+    "@typescript-eslint/prefer-optional-chain": "error",
+
+    // Consistent type definitions
+    "@typescript-eslint/consistent-type-definitions": ["error", "interface"],
+    "@typescript-eslint/consistent-type-imports": [
+      "error",
+      {
+        "prefer": "type-imports",
+        "disallowTypeAnnotations": false
+      }
+    ],
+
+    // Array and function types
+    "@typescript-eslint/array-type": ["error", { "default": "array-simple" }],
+    "@typescript-eslint/prefer-function-type": "error",
+
+    // Promise handling
+    "@typescript-eslint/no-floating-promises": "error",
+    "@typescript-eslint/no-misused-promises": "error",
+    "@typescript-eslint/require-await": "error",
+
+    // =============================================================================
+    // JAVASCRIPT/GENERAL RULES
+    // =============================================================================
+    // FORBIDDEN: No console.log in production code
+    "no-console": "error",
+
+    // FORBIDDEN: No synchronous file operations
+    "no-sync": "error",
+
+    // Error handling
+    "prefer-promise-reject-errors": "error",
+    "no-throw-literal": "error",
+
+    // Code quality
+    "no-var": "error",
+    "prefer-const": "error",
+    "prefer-arrow-callback": "error",
+    "arrow-body-style": ["error", "as-needed"],
+    "prefer-template": "error",
+    "object-shorthand": "error",
+
+    // Async/await over callbacks
+    "prefer-async-await": "off", // Custom rule would be needed
+    "no-async-promise-executor": "error",
+    "no-await-in-loop": "warn",
+
+    // Import/export organization
+    "sort-imports": [
+      "error",
+      {
+        "ignoreCase": true,
+        "ignoreDeclarationSort": true,
+        "ignoreMemberSort": false
+      }
+    ],
+
+    // Naming conventions
+    "@typescript-eslint/naming-convention": [
+      "error",
+      {
+        "selector": "variableLike",
+        "format": ["camelCase"],
+        "leadingUnderscore": "allow"
+      },
+      {
+        "selector": "function",
+        "format": ["camelCase"]
+      },
+      {
+        "selector": "typeLike",
+        "format": ["PascalCase"]
+      },
+      {
+        "selector": "enumMember",
+        "format": ["UPPER_CASE"]
+      },
+      {
+        "selector": "classProperty",
+        "modifiers": ["private"],
+        "format": ["camelCase"],
+        "leadingUnderscore": "require"
+      }
+    ],
+
+    // =============================================================================
+    // CODE ORGANISATION AND CLEANLINESS
+    // =============================================================================
+    // No unused variables or imports
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "ignoreRestSiblings": true
+      }
+    ],
+
+    // Complexity limits
+    "complexity": ["warn", 10],
+    "max-depth": ["warn", 4],
+    "max-lines-per-function": [
+      "warn",
+      { "max": 100, "skipBlankLines": true, "skipComments": true }
+    ],
+
+    // Prevent debugging code in production
+    "no-debugger": "error",
+    "no-alert": "error",
+
+    // =============================================================================
+    // SECURITY AND BEST PRACTICES
+    // =============================================================================
+    // Prevent eval and similar
+    "no-eval": "error",
+    "no-implied-eval": "error",
+    "no-new-func": "error",
+
+    // Object property access
+    "dot-notation": "error",
+    "prefer-destructuring": [
+      "error",
+      {
+        "VariableDeclarator": {
+          "array": false,
+          "object": true
+        },
+        "AssignmentExpression": {
+          "array": true,
+          "object": false
+        }
+      },
+      {
+        "enforceForRenamedProperties": false
+      }
+    ],
+
+    // =============================================================================
+    // PERFORMANCE
+    // =============================================================================
+    "no-loop-func": "error",
+    "no-inner-declarations": "error",
+
+    // =============================================================================
+    // NODE.JS SPECIFIC
+    // =============================================================================
+    "no-process-exit": "error",
+    "no-buffer-constructor": "error",
+    "no-path-concat": "error"
+  },
+  "overrides": [
+    {
+      // Test files can be more lenient
+      "files": ["**/*.test.ts", "**/*.spec.ts", "**/__tests__/**/*.ts"],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "warn",
+        "@typescript-eslint/explicit-function-return-type": "off",
+        "no-console": "off"
+      }
+    },
+    {
+      // Configuration files can use require
+      "files": ["**/*.config.js", "**/*.config.ts", "**/jest.config.js"],
+      "rules": {
+        "@typescript-eslint/no-var-requires": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "dist/",
+    "node_modules/",
+    "coverage/",
+    "*.config.js",
+    "jest.config.js"
+  ]
+}

@@ -1,0 +1,196 @@
+version: "3.8"
+
+# =============================================================================
+# TASSIE REDDIT BOT - DOCKER COMPOSE CONFIGURATION
+# =============================================================================
+# Production-ready Docker Compose setup with proper networking,
+# persistent storage, and health monitoring
+
+services:
+  # =============================================================================
+  # REDDIT BOT SERVICE
+  # =============================================================================
+  tassie-reddit-bot:
+    # Build configuration
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+
+    # Container name for easy identification
+    container_name: tassie-reddit-bot
+
+    # Restart policy - always restart unless explicitly stopped
+    restart: unless-stopped
+
+    # Environment variables
+    env_file:
+      - .env
+
+    # Additional environment overrides for Docker
+    environment:
+      - NODE_ENV=production
+      - LOG_DIRECTORY=/app/logs
+      - STORAGE_FILE_PATH=/app/data/posted-ids.json
+      - HEALTH_CHECK_PORT=3000
+
+    # Port mapping for health checks
+    ports:
+      - "${HEALTH_CHECK_PORT:-3000}:3000"
+
+    # Volume mounts for persistent data
+    volumes:
+      # Persistent storage for processed post IDs
+      - bot_data:/app/data
+      # Log files for debugging and monitoring
+      - bot_logs:/app/logs
+      # Optional: Mount timezone data for accurate scheduling
+      - /etc/localtime:/etc/localtime:ro
+
+    # Health check configuration
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => { process.exit(1); });",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Resource limits to prevent overconsumption
+    deploy:
+      resources:
+        limits:
+          # Limit memory usage to 512MB
+          memory: 512M
+          # Limit CPU usage to 1 core
+          cpus: "1.0"
+        reservations:
+          # Reserve minimum resources
+          memory: 128M
+          cpus: "0.1"
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+        labels: "service,version"
+
+    # Labels for container management
+    labels:
+      - "com.example.service=tassie-reddit-bot"
+      - "com.example.version=1.0.0"
+      - "com.example.description=Reddit to Discord bot for r/tasmania"
+
+    # Network configuration
+    networks:
+      - bot_network
+
+    # Dependencies (if you add database or other services later)
+    # depends_on:
+    #   - redis
+    #   - postgres
+
+# =============================================================================
+# NETWORK CONFIGURATION
+# =============================================================================
+networks:
+  bot_network:
+    driver: bridge
+    name: tassie_bot_network
+    labels:
+      - "com.example.network=bot"
+
+# =============================================================================
+# VOLUME CONFIGURATION
+# =============================================================================
+volumes:
+  # Persistent storage for bot data (processed post IDs, state)
+  bot_data:
+    driver: local
+    labels:
+      - "com.example.volume=data"
+
+  # Log storage for debugging and monitoring
+  bot_logs:
+    driver: local
+    labels:
+      - "com.example.volume=logs"
+# =============================================================================
+# OPTIONAL: ADDITIONAL SERVICES
+# =============================================================================
+# Uncomment and configure these services as needed
+
+# Redis for caching and rate limiting (optional)
+# redis:
+#   image: redis:7-alpine
+#   container_name: tassie-bot-redis
+#   restart: unless-stopped
+#   command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+#   volumes:
+#     - redis_data:/data
+#   networks:
+#     - bot_network
+#   healthcheck:
+#     test: ["CMD", "redis-cli", "ping"]
+#     interval: 30s
+#     timeout: 10s
+#     retries: 3
+
+# PostgreSQL for advanced data storage (optional)
+# postgres:
+#   image: postgres:15-alpine
+#   container_name: tassie-bot-postgres
+#   restart: unless-stopped
+#   environment:
+#     POSTGRES_DB: tassie_bot
+#     POSTGRES_USER: botuser
+#     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+#   volumes:
+#     - postgres_data:/var/lib/postgresql/data
+#   networks:
+#     - bot_network
+#   healthcheck:
+#     test: ["CMD-SHELL", "pg_isready -U botuser -d tassie_bot"]
+#     interval: 30s
+#     timeout: 10s
+#     retries: 3
+
+# Monitoring with Prometheus (optional)
+# prometheus:
+#   image: prom/prometheus:latest
+#   container_name: tassie-bot-prometheus
+#   restart: unless-stopped
+#   ports:
+#     - "9090:9090"
+#   volumes:
+#     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+#     - prometheus_data:/prometheus
+#   networks:
+#     - bot_network
+
+# Log aggregation with Grafana Loki (optional)
+# loki:
+#   image: grafana/loki:latest
+#   container_name: tassie-bot-loki
+#   restart: unless-stopped
+#   ports:
+#     - "3100:3100"
+#   volumes:
+#     - ./monitoring/loki.yml:/etc/loki/local-config.yaml
+#     - loki_data:/loki
+#   networks:
+#     - bot_network
+
+# Additional volumes for optional services
+# volumes:
+#   redis_data:
+#   postgres_data:
+#   prometheus_data:
+#   loki_data:
