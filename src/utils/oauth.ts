@@ -105,6 +105,14 @@ export class RedditOAuth2Manager {
         `${this.config.clientId}:${this.config.clientSecret}`,
       ).toString("base64");
 
+      // Log what we're sending (with sensitive parts masked)
+      logger.debug("Attempting OAuth2 token refresh", {
+        clientId: this.config.clientId.substring(0, 8) + "...",
+        refreshTokenLength: refreshToken.length,
+        refreshTokenPreview: refreshToken.substring(0, 10) + "...",
+        userAgent: this.config.userAgent,
+      });
+
       const response = await axios.post<TokenResponse>(
         "https://www.reddit.com/api/v1/access_token",
         new URLSearchParams({
