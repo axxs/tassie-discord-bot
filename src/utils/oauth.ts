@@ -190,8 +190,14 @@ export class RedditOAuth2Manager {
         },
       );
 
+      if (!response.data.refresh_token) {
+        throw new Error(
+          "No refresh token received from Reddit. Ensure 'duration=permanent' is set in authorization URL.",
+        );
+      }
+
       const tokenData: StoredTokenData = {
-        refreshToken: response.data.refresh_token || authCode, // Use refresh_token from response, fallback to auth code
+        refreshToken: response.data.refresh_token,
         accessToken: response.data.access_token,
         expiresAt: Date.now() + response.data.expires_in * 1000,
         scope: response.data.scope,
@@ -252,59 +258,94 @@ export class RedditOAuth2Manager {
    * Load token data from file or environment variable
    */
   private async loadTokenData(): Promise<Result<StoredTokenData>> {
-    // First try to load from environment variable (for production)
-    const envRefreshToken = process.env.REDDIT_REFRESH_TOKEN;
-    if (envRefreshToken) {
-      logger.info("Loading Reddit tokens from environment variable");
-
-      // Try to exchange as authorization code first (most common case for fresh setups)
-      logger.info("Attempting to exchange token as authorization code");
-      const exchangeResult = await this.exchangeCodeForTokens(envRefreshToken);
-
-      if (exchangeResult.success) {
-        logger.info(
-          "Successfully exchanged authorization code for refresh token",
-        );
-        return {
-          success: true,
-          data: exchangeResult.data,
-        };
-      }
-
-      // If exchange failed, treat as existing refresh token
-      logger.info("Token exchange failed, treating as existing refresh token");
-      return {
-        success: true,
-        data: {
-          refreshToken: envRefreshToken,
-          accessToken: "", // Will be refreshed
-          expiresAt: 0, // Force refresh
-          scope: "read",
-        },
-      };
-    }
-
-    // Fallback to file-based storage (for local development)
+    // First check if we have tokens saved in file (from previous successful exchange)
     try {
       const data = await fs.readFile(this.tokenFilePath, "utf-8");
       const tokenData = JSON.parse(data) as StoredTokenData;
-
+      logger.info("Loaded existing OAuth2 tokens from file");
       return {
         success: true,
         data: tokenData,
       };
-    } catch (error) {
-      return {
-        success: false,
-        error: {
-          message: "Failed to load token data",
-          code: "OAUTH_LOAD_ERROR",
-          originalError:
-            error instanceof Error ? error : new Error(String(error)),
-          context: { tokenFilePath: this.tokenFilePath },
-        },
-      };
+    } catch (fileError) {
+      // File doesn't exist or is unreadable, continue to check env var
+      logger.debug("No stored tokens found in file, checking environment");
     }
+
+    // Try to load from environment variable (for production)
+    const envRefreshToken = process.env.REDDIT_REFRESH_TOKEN;
+    if (envRefreshToken) {
+      logger.info("Loading Reddit tokens from environment variable");
+
+      // Check if this looks like an authorization code (typically much longer than refresh tokens)
+      // Authorization codes are usually 60+ characters and contain underscores
+      // Refresh tokens are typically shorter and alphanumeric
+      const looksLikeAuthCode =
+        envRefreshToken.length > 50 && envRefreshToken.includes("_");
+
+      if (looksLikeAuthCode) {
+        logger.info(
+          "Token appears to be an authorization code, attempting exchange",
+        );
+        const exchangeResult =
+          await this.exchangeCodeForTokens(envRefreshToken);
+
+        if (exchangeResult.success) {
+          logger.info(
+            "Successfully exchanged authorization code for refresh token",
+          );
+          // Clear the environment variable hint after successful exchange
+          logger.info(
+            "IMPORTANT: Authorization code has been exchanged. You should now update REDDIT_REFRESH_TOKEN " +
+              "with the refresh token to avoid repeated exchange attempts.",
+          );
+          return {
+            success: true,
+            data: exchangeResult.data,
+          };
+        }
+
+        // Exchange failed - this might be an expired authorization code
+        logger.error(
+          "Failed to exchange authorization code. Code may be expired or already used. " +
+            "Please generate a new authorization code.",
+        );
+        return {
+          success: false,
+          error: {
+            message:
+              "Authorization code exchange failed. Please generate a new authorization code.",
+            code: "OAUTH_CODE_EXPIRED",
+            context: { tokenFilePath: this.tokenFilePath },
+          },
+        };
+      } else {
+        // Treat as refresh token
+        logger.info(
+          "Token appears to be a refresh token, will use for token refresh",
+        );
+        return {
+          success: true,
+          data: {
+            refreshToken: envRefreshToken,
+            accessToken: "", // Will be refreshed
+            expiresAt: 0, // Force refresh
+            scope: "read",
+          },
+        };
+      }
+    }
+
+    // No tokens found anywhere
+    return {
+      success: false,
+      error: {
+        message:
+          "No stored tokens found. Please run OAuth2 setup first or set REDDIT_REFRESH_TOKEN environment variable.",
+        code: "OAUTH_NO_TOKENS",
+        context: { tokenFilePath: this.tokenFilePath },
+      },
+    };
   }
 
   /**
