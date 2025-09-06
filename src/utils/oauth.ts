@@ -295,11 +295,13 @@ export class RedditOAuth2Manager {
     if (envRefreshToken) {
       logger.info("Loading Reddit tokens from environment variable");
 
-      // Check if this looks like an authorization code (typically much longer than refresh tokens)
-      // Authorization codes are usually 60+ characters and contain underscores
-      // Refresh tokens are typically shorter and alphanumeric
+      // Check if this looks like an authorization code vs refresh token
+      // Authorization codes: typically contain hyphens and underscores, 27-45 chars
+      // Refresh tokens: typically numeric or alphanumeric without special chars, variable length
+      const containsHyphen = envRefreshToken.includes("-");
+      const containsUnderscore = envRefreshToken.includes("_");
       const looksLikeAuthCode =
-        envRefreshToken.length > 50 && envRefreshToken.includes("_");
+        containsHyphen || (containsUnderscore && envRefreshToken.length < 50);
 
       if (looksLikeAuthCode) {
         logger.info(
