@@ -54,7 +54,8 @@ export class RedditOAuth2Manager {
         return {
           success: false,
           error: {
-            message: "No stored tokens found. Please run OAuth2 setup first.",
+            message:
+              "No stored tokens found. Please run OAuth2 setup first or set REDDIT_REFRESH_TOKEN environment variable.",
             code: "OAUTH_NO_TOKENS",
             context: { tokenFilePath: this.tokenFilePath },
           },
@@ -247,9 +248,25 @@ export class RedditOAuth2Manager {
   }
 
   /**
-   * Load token data from file
+   * Load token data from file or environment variable
    */
   private async loadTokenData(): Promise<Result<StoredTokenData>> {
+    // First try to load from environment variable (for production)
+    const envRefreshToken = process.env.REDDIT_REFRESH_TOKEN;
+    if (envRefreshToken) {
+      logger.info("Loading Reddit tokens from environment variable");
+      return {
+        success: true,
+        data: {
+          refreshToken: envRefreshToken,
+          accessToken: "", // Will be refreshed
+          expiresAt: 0, // Force refresh
+          scope: "read",
+        },
+      };
+    }
+
+    // Fallback to file-based storage (for local development)
     try {
       const data = await fs.readFile(this.tokenFilePath, "utf-8");
       const tokenData = JSON.parse(data) as StoredTokenData;

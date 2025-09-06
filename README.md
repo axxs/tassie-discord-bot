@@ -49,7 +49,22 @@ cp .env.example .env
 
 Edit `.env` with your credentials (see configuration sections below).
 
-### 4. Build and Start
+### 4. Set Up Reddit OAuth2 Authentication
+
+Run the interactive OAuth2 setup wizard:
+
+```bash
+npm run setup:oauth
+```
+
+This will:
+
+- Validate your Reddit app configuration
+- Open your browser for secure authentication
+- Save access tokens automatically
+- Guide you through any issues
+
+### 5. Build and Start
 
 For development:
 
@@ -66,31 +81,48 @@ npm start
 
 ## 🔧 Configuration
 
-### Reddit API Setup
+### Reddit API Setup (OAuth2)
+
+The bot now uses secure OAuth2 authentication instead of username/password.
 
 1. **Create Reddit App**:
    - Go to [Reddit App Preferences](https://www.reddit.com/prefs/apps)
    - Click "Create App" or "Create Another App"
-   - Choose **"script"** as the app type
+   - Choose **"web app"** as the app type ⚠️ **Important: NOT "script"**
    - Fill in the form:
      - **Name**: `Tassie Reddit Bot` (or your preferred name)
      - **Description**: `Bot for monitoring r/tasmania`
      - **About URL**: Leave blank or add your GitHub repo
-     - **Redirect URI**: `http://localhost:8080` (required but not used)
+     - **Redirect URI**: `http://localhost:8080/auth/callback` ⚠️ **Must match exactly**
 
 2. **Get Your Credentials**:
    - **Client ID**: Found under the app name (short string)
    - **Client Secret**: The longer "secret" string shown
 
 3. **Update .env File**:
+
    ```env
    REDDIT_CLIENT_ID=your_client_id_here
    REDDIT_CLIENT_SECRET=your_client_secret_here
-   REDDIT_USERNAME=your_reddit_username
-   REDDIT_PASSWORD=your_reddit_password
+   REDDIT_REDIRECT_URI=http://localhost:8080/auth/callback
    REDDIT_USER_AGENT=TassieRedditBot/1.0.0 by u/your-username
    REDDIT_SUBREDDIT=tasmania
    ```
+
+4. **Run OAuth2 Setup**:
+
+   ```bash
+   npm run setup:oauth
+   ```
+
+   The setup wizard will:
+   - Validate your configuration
+   - Start a temporary web server
+   - Open Reddit's authorization page in your browser
+   - Handle the OAuth2 flow automatically
+   - Save secure access tokens for future use
+
+> **🔒 Security Benefits**: No passwords required! The bot authenticates securely using OAuth2 tokens that can be revoked anytime from your Reddit account settings.
 
 ### Discord Webhook Setup
 
@@ -238,6 +270,8 @@ Ensure your repository contains:
 
 #### 4. Environment Variables Configuration
 
+⚠️ **Important**: The bot now uses OAuth2 authentication, so you need to set up Reddit authentication differently for production deployment.
+
 In Coolify's **Environment Variables** section, add all required variables:
 
 **Required Variables**:
@@ -245,11 +279,12 @@ In Coolify's **Environment Variables** section, add all required variables:
 ```env
 REDDIT_CLIENT_ID=your_reddit_client_id
 REDDIT_CLIENT_SECRET=your_reddit_client_secret
-REDDIT_USERNAME=your_reddit_username
-REDDIT_PASSWORD=your_reddit_password
+REDDIT_REDIRECT_URI=https://your-domain.com/auth/callback
 REDDIT_SUBREDDIT=tasmania
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_TOKEN
 ```
+
+> **🔗 Redirect URI**: For production deployment, you **must** update your Reddit app's redirect URI to match your domain. It should be `https://your-domain.com/auth/callback` or the specific URL where your bot is hosted.
 
 **Optional Variables** (with recommended values):
 
@@ -280,7 +315,60 @@ NODE_ENV=production
    /app/logs -> ./logs (persistent)
    ```
 
-#### 6. Health Check Configuration
+#### 6. OAuth2 Setup for Production
+
+**⚠️ Critical**: OAuth2 requires special setup for production deployment. You have two options:
+
+##### Option A: Manual Token Setup (Recommended)
+
+1. **Set up OAuth2 locally first**:
+
+   ```bash
+   # On your local machine
+   git clone https://github.com/your-username/tassie-reddit-bot.git
+   cd tassie-reddit-bot
+   npm install
+   cp .env.example .env
+   # Edit .env with your credentials and REDDIT_REDIRECT_URI=http://localhost:8080/auth/callback
+   npm run setup:oauth
+   ```
+
+2. **Copy tokens to production**:
+   - After local OAuth2 setup, find the tokens file: `data/reddit-tokens.json`
+   - Copy the `refreshToken` value from this file
+   - In Coolify, add environment variable:
+     ```env
+     REDDIT_REFRESH_TOKEN=your_refresh_token_from_local_setup
+     ```
+
+3. **Update Reddit app redirect URI**:
+   - Go to [Reddit App Preferences](https://www.reddit.com/prefs/apps)
+   - Edit your app
+   - **Add** (don't replace) redirect URI: `https://your-domain.com/auth/callback`
+   - Now your app supports both local development and production
+
+##### Option B: Production OAuth2 Flow (Advanced)
+
+If you want to set up OAuth2 directly on the production server:
+
+1. **Update Reddit app**:
+   - Set redirect URI to: `https://your-domain.com/auth/callback`
+
+2. **Add temporary environment variable**:
+
+   ```env
+   OAUTH_SETUP_MODE=true
+   ```
+
+3. **Deploy and access OAuth2 endpoint**:
+   - Deploy the application normally
+   - Visit: `https://your-domain.com/setup-oauth`
+   - Follow the OAuth2 flow
+   - Remove `OAUTH_SETUP_MODE` after setup
+
+> **💡 Tip**: Option A is simpler and more secure for most users. Option B requires additional setup code and exposes an OAuth2 endpoint temporarily.
+
+#### 7. Health Check Configuration
 
 Coolify will automatically detect the health check from the Dockerfile, but you can customise:
 
