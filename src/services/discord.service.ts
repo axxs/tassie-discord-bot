@@ -237,10 +237,8 @@ export class DiscordService {
       description = `🔗 [Link to external content](${post.url})`;
     }
 
-    // Format thumbnail - only use if it's a valid URL
-    const thumbnail = this.isValidImageUrl(post.thumbnail)
-      ? { url: post.thumbnail }
-      : undefined;
+    // Handle media - prioritise full-size images over thumbnails
+    const mediaInfo = this.getMediaInfo(post);
 
     // Create embed
     const embed: DiscordEmbed = {
@@ -258,13 +256,21 @@ export class DiscordService {
         icon_url:
           "https://www.redditstatic.com/avatars/avatar_default_02_A5A4A4.png",
       },
-      thumbnail,
       footer: {
         text: `r/${post.subreddit} • ${post.ups} upvotes • ${post.num_comments} comments`,
         icon_url:
           "https://www.redditstatic.com/desktop2x/img/favicon/favicon-96x96.png",
       },
     };
+
+    // Add media based on type and availability
+    if (mediaInfo.fullImage) {
+      // Use full-size image for better display
+      embed.image = { url: mediaInfo.fullImage };
+    } else if (mediaInfo.thumbnail) {
+      // Fallback to thumbnail if no full image available
+      embed.thumbnail = { url: mediaInfo.thumbnail };
+    }
 
     // Add flair as a field if present
     if (post.link_flair_text) {
@@ -300,6 +306,74 @@ export class DiscordService {
     if (flairLower.includes("announcement")) return DISCORD_COLORS.ANNOUNCEMENT;
 
     return DISCORD_COLORS.DEFAULT;
+  }
+
+  /**
+   * Get media information from a Reddit post
+   * Determines the best image/media to display in Discord
+   *
+   * @param post - Reddit post to analyze
+   * @returns Media info with full image and thumbnail URLs
+   */
+  private getMediaInfo(post: RedditPost): {
+    fullImage?: string;
+    thumbnail?: string;
+  } {
+    const result: { fullImage?: string; thumbnail?: string } = {};
+
+    // Only check external URLs for direct images (not Reddit permalinks)
+    if (post.url !== post.permalink && this.isDirectImageUrl(post.url)) {
+      result.fullImage = post.url;
+      logger.debug("Using full-size image from post URL", {
+        postId: post.id,
+        imageUrl: post.url,
+      });
+    }
+
+    // Always check for valid thumbnail as fallback
+    if (this.isValidImageUrl(post.thumbnail)) {
+      result.thumbnail = post.thumbnail;
+    }
+
+    return result;
+  }
+
+  /**
+   * Check if a URL is a direct image URL
+   *
+   * @param url - URL to check
+   * @returns True if it's a direct image URL
+   */
+  private isDirectImageUrl(url: string): boolean {
+    if (!url) {
+      return false;
+    }
+
+    try {
+      const parsedUrl = new URL(url);
+
+      // Common image file extensions
+      const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+      const pathname = parsedUrl.pathname.toLowerCase();
+
+      if (imageExtensions.some((ext) => pathname.endsWith(ext))) {
+        return true;
+      }
+
+      // Reddit image hosting
+      if (parsedUrl.hostname.includes("i.redd.it")) {
+        return true;
+      }
+
+      // Imgur direct links
+      if (parsedUrl.hostname.includes("i.imgur.com")) {
+        return true;
+      }
+
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -519,6 +593,7 @@ export class DiscordService {
   /**
    * Generate a thread name from a Reddit post
    * Formats the title according to Discord's thread naming requirements
+   * Uses exact Reddit flair text as Discord tags without username suffix
    *
    * @param post - Reddit post to generate thread name for
    * @returns Formatted thread name
@@ -532,7 +607,7 @@ export class DiscordService {
       threadName += this.config.threadPrefix;
     }
 
-    // Add flair if available
+    // Add flair if available - keep exact text from Reddit
     if (post.link_flair_text) {
       threadName += `[${post.link_flair_text}] `;
     }
@@ -540,8 +615,7 @@ export class DiscordService {
     // Add the post title
     threadName += post.title;
 
-    // Add author for context
-    threadName += ` (by u/${post.author})`;
+    // Note: Removed author suffix as it's redundant with embed author info
 
     // Truncate to Discord's thread name limit
     const maxLength = this.config.threadNameMaxLength || 80;
