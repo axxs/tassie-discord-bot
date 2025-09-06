@@ -140,8 +140,18 @@ export class RedditOAuth2Manager {
         data: response.data.access_token,
       };
     } catch (error) {
+      let errorDetails = "";
+      if (axios.isAxiosError(error) && error.response) {
+        errorDetails = `Status: ${error.response.status}, Data: ${JSON.stringify(error.response.data)}`;
+        logger.error("Reddit API error details", {
+          status: error.response.status,
+          data: error.response.data,
+          headers: error.response.headers,
+        });
+      }
+
       const botError: BotError = {
-        message: "Failed to refresh OAuth2 access token",
+        message: `Failed to refresh OAuth2 access token. ${errorDetails}`,
         code: "OAUTH_REFRESH_ERROR",
         originalError:
           error instanceof Error ? error : new Error(String(error)),
