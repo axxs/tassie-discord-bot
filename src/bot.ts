@@ -466,12 +466,19 @@ export class RedditDiscordBot {
     // Test Discord connection
     const discordTest = await this.discordService.testConnection();
     if (!discordTest.success) {
-      throw new Error(
-        `Discord connection test failed: ${discordTest.error.message}`,
+      logger.warn(
+        "Discord connection test failed - please check webhook URL and permissions",
+        {
+          error: discordTest.error.message,
+          code: discordTest.error.code,
+        },
       );
+      // Don't throw error - allow bot to start for troubleshooting
+    } else {
+      logger.info("Discord connection test successful");
     }
 
-    logger.info("All service connections tested successfully");
+    logger.info("Service connection tests completed");
   }
 
   /**
