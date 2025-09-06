@@ -319,7 +319,7 @@ NODE_ENV=production
 
 **⚠️ Critical**: OAuth2 requires special setup for production deployment. You have two options:
 
-##### Option A: Manual Token Setup (Recommended)
+##### Option A: Manual Token Setup (Recommended for Security)
 
 1. **Set up OAuth2 locally first**:
 
@@ -341,32 +341,46 @@ NODE_ENV=production
      REDDIT_REFRESH_TOKEN=your_refresh_token_from_local_setup
      ```
 
-3. **Update Reddit app redirect URI**:
+##### Option B: Direct Production OAuth2 Flow
+
+**New**: The bot now includes a built-in OAuth2 callback handler! Perfect for Coolify deployments.
+
+1. **Update Reddit app redirect URI**:
    - Go to [Reddit App Preferences](https://www.reddit.com/prefs/apps)
-   - Edit your app
-   - **Add** (don't replace) redirect URI: `https://your-domain.com/auth/callback`
-   - Now your app supports both local development and production
+   - Edit your Reddit application
+   - Set redirect URI to: `https://your-domain.com/auth/callback` (e.g., `https://reddut.nwtassie.com/auth/callback`)
 
-##### Option B: Production OAuth2 Flow (Advanced)
+2. **Deploy application first**:
+   - Deploy the bot with all environment variables EXCEPT `REDDIT_REFRESH_TOKEN`
+   - The bot will start but won't be able to fetch posts yet (this is expected)
 
-If you want to set up OAuth2 directly on the production server:
+3. **Complete OAuth2 authorization**:
+   - Visit your Reddit app and get the authorization URL:
+     ```
+     https://www.reddit.com/api/v1/authorize?client_id=YOUR_CLIENT_ID&response_type=code&redirect_uri=https://your-domain.com/auth/callback&duration=permanent&scope=read&state=reddit-bot-auth
+     ```
+   - Replace `YOUR_CLIENT_ID` and `your-domain.com` with your actual values
+   - Visit this URL in your browser and authorize the application
+   - You'll be redirected to your domain with the authorization code
 
-1. **Update Reddit app**:
-   - Set redirect URI to: `https://your-domain.com/auth/callback`
+4. **Set the authorization code**:
+   - Copy the authorization code from the success page
+   - In Coolify, add this environment variable:
+     ```env
+     REDDIT_REFRESH_TOKEN=your_authorization_code_from_callback
+     ```
+   - Restart the application
 
-2. **Add temporary environment variable**:
+5. **Verify setup**:
+   - Check application logs for "Successfully refreshed OAuth2 access token"
+   - The bot should now be able to fetch posts from Reddit
 
-   ```env
-   OAUTH_SETUP_MODE=true
-   ```
+##### Which Option to Choose?
 
-3. **Deploy and access OAuth2 endpoint**:
-   - Deploy the application normally
-   - Visit: `https://your-domain.com/setup-oauth`
-   - Follow the OAuth2 flow
-   - Remove `OAUTH_SETUP_MODE` after setup
+- **Option A**: More secure, requires local development setup
+- **Option B**: Easier for production-only deployments, uses the built-in callback handler
 
-> **💡 Tip**: Option A is simpler and more secure for most users. Option B requires additional setup code and exposes an OAuth2 endpoint temporarily.
+> **💡 Production Tip**: Option B is now the recommended approach for Coolify deployments since the bot handles the OAuth2 callback automatically.
 
 #### 7. Health Check Configuration
 

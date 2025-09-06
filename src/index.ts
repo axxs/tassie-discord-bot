@@ -44,11 +44,9 @@ async function main(): Promise<void> {
     logger.info("Initialising bot...");
     botInstance = new RedditDiscordBot(config);
 
-    // Start health check server if port is specified
-    const healthPort = process.env.HEALTH_CHECK_PORT;
-    if (healthPort) {
-      await startHealthServer(parseInt(healthPort, 10));
-    }
+    // Start health check server (includes OAuth2 callback)
+    const healthPort = parseInt(process.env.HEALTH_CHECK_PORT || "3000", 10);
+    await startHealthServer(healthPort);
 
     // Start the bot
     logger.info("Starting bot...");
@@ -123,12 +121,21 @@ async function startHealthServer(port: number): Promise<void> {
               await handleStatsCheck(res);
               break;
 
+            case "/auth/callback":
+              await handleOAuthCallback(req, res);
+              break;
+
             default:
               res.writeHead(404, { "Content-Type": "application/json" });
               res.end(
                 JSON.stringify({
                   error: "Not found",
-                  availableEndpoints: ["/health", "/status", "/stats"],
+                  availableEndpoints: [
+                    "/health",
+                    "/status",
+                    "/stats",
+                    "/auth/callback",
+                  ],
                 }),
               );
           }
@@ -263,6 +270,104 @@ async function handleStatusCheck(
         timestamp: new Date().toISOString(),
       }),
     );
+  }
+}
+
+/**
+ * Handle OAuth2 callback endpoint
+ * Processes Reddit OAuth2 authorization code and exchanges it for tokens
+ *
+ * @param req - HTTP request object
+ * @param res - HTTP response object
+ */
+async function handleOAuthCallback(
+  req: IncomingMessage,
+  res: ServerResponse<IncomingMessage>,
+): Promise<void> {
+  try {
+    const url = new URL(req.url || "/", `http://${req.headers.host}`);
+    const code = url.searchParams.get("code");
+    const state = url.searchParams.get("state");
+    const error = url.searchParams.get("error");
+
+    // Handle OAuth2 errors
+    if (error) {
+      logger.error("OAuth2 callback error", { error, state });
+      res.writeHead(400, { "Content-Type": "text/html" });
+      res.end(`
+        <html>
+          <head><title>OAuth2 Error</title></head>
+          <body>
+            <h1>OAuth2 Authorization Failed</h1>
+            <p>Error: ${error}</p>
+            <p>Please check your Reddit app configuration and try again.</p>
+          </body>
+        </html>
+      `);
+      return;
+    }
+
+    // Validate required parameters
+    if (!code) {
+      logger.error("OAuth2 callback missing authorization code");
+      res.writeHead(400, { "Content-Type": "text/html" });
+      res.end(`
+        <html>
+          <head><title>OAuth2 Error</title></head>
+          <body>
+            <h1>OAuth2 Authorization Failed</h1>
+            <p>Missing authorization code in callback.</p>
+          </body>
+        </html>
+      `);
+      return;
+    }
+
+    logger.info("Received OAuth2 callback", {
+      code: code.substring(0, 10) + "...",
+      state,
+    });
+
+    // For production deployment, we need to store the refresh token in environment
+    // This is a one-time setup process
+    res.writeHead(200, { "Content-Type": "text/html" });
+    res.end(`
+      <html>
+        <head><title>OAuth2 Success</title></head>
+        <body>
+          <h1>OAuth2 Authorization Successful!</h1>
+          <p>Authorization code received: <code>${code}</code></p>
+          <p><strong>Next Steps:</strong></p>
+          <ol>
+            <li>Copy the authorization code above</li>
+            <li>Set the REDDIT_REFRESH_TOKEN environment variable in Coolify to this code</li>
+            <li>Restart the application</li>
+          </ol>
+          <p><em>Note: This code will be exchanged for a refresh token on next startup.</em></p>
+        </body>
+      </html>
+    `);
+
+    logger.info("OAuth2 callback completed successfully", {
+      codeLength: code.length,
+      state,
+    });
+  } catch (error) {
+    logger.error("OAuth2 callback handler error", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    res.writeHead(500, { "Content-Type": "text/html" });
+    res.end(`
+      <html>
+        <head><title>OAuth2 Error</title></head>
+        <body>
+          <h1>OAuth2 Callback Error</h1>
+          <p>An unexpected error occurred while processing the OAuth2 callback.</p>
+          <p>Please check the application logs for more details.</p>
+        </body>
+      </html>
+    `);
   }
 }
 

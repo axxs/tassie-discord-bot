@@ -96,7 +96,7 @@ CMD ["node", "dist/index.js"]
 LABEL maintainer="Tassie Reddit Bot"
 LABEL description="Reddit to Discord bot for monitoring r/tasmania subreddit"
 LABEL version="1.0.0"
-LABEL org.opencontainers.image.source="https://github.com/your-username/tassie-reddit-bot"
+LABEL org.opencontainers.image.source="https://github.com/axxs/tassie-reddit-bot"
 LABEL org.opencontainers.image.description="Monitors Reddit posts and forwards them to Discord"
 LABEL org.opencontainers.image.licenses="MIT"
 
