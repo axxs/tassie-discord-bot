@@ -257,37 +257,31 @@ export class RedditOAuth2Manager {
     if (envRefreshToken) {
       logger.info("Loading Reddit tokens from environment variable");
 
-      // Check if this looks like an authorization code (long) vs refresh token (shorter)
-      // Authorization codes are typically 100+ characters, refresh tokens are shorter
-      if (envRefreshToken.length > 100) {
-        logger.info("Detected authorization code, will exchange for tokens");
+      // Try to exchange as authorization code first (most common case for fresh setups)
+      logger.info("Attempting to exchange token as authorization code");
+      const exchangeResult = await this.exchangeCodeForTokens(envRefreshToken);
 
-        // This is an authorization code, exchange it for tokens
-        const exchangeResult =
-          await this.exchangeCodeForTokens(envRefreshToken);
-        if (!exchangeResult.success) {
-          return {
-            success: false,
-            error: exchangeResult.error,
-          };
-        }
-
+      if (exchangeResult.success) {
+        logger.info(
+          "Successfully exchanged authorization code for refresh token",
+        );
         return {
           success: true,
           data: exchangeResult.data,
         };
-      } else {
-        // This is already a refresh token
-        return {
-          success: true,
-          data: {
-            refreshToken: envRefreshToken,
-            accessToken: "", // Will be refreshed
-            expiresAt: 0, // Force refresh
-            scope: "read",
-          },
-        };
       }
+
+      // If exchange failed, treat as existing refresh token
+      logger.info("Token exchange failed, treating as existing refresh token");
+      return {
+        success: true,
+        data: {
+          refreshToken: envRefreshToken,
+          accessToken: "", // Will be refreshed
+          expiresAt: 0, // Force refresh
+          scope: "read",
+        },
+      };
     }
 
     // Fallback to file-based storage (for local development)

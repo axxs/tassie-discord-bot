@@ -75,6 +75,8 @@ export class DiscordService {
           status: error.response?.status,
           statusText: error.response?.statusText,
           message: error.message,
+          responseData: error.response?.data,
+          requestData: error.config?.data,
         });
         return Promise.reject(error);
       },
@@ -475,6 +477,14 @@ export class DiscordService {
           },
         ],
       };
+
+      // Add thread_name for forum channels
+      if (this.config.enableThreading && this.config.isForumChannel) {
+        testPayload.thread_name = `${this.config.threadPrefix || ""}Bot Connection Test`;
+        logger.debug("Adding thread_name for forum channel test", {
+          threadName: testPayload.thread_name,
+        });
+      }
 
       const result = await this.sendWithRetry(testPayload);
 
