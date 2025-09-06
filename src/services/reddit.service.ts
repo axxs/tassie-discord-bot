@@ -13,7 +13,7 @@ import { RedditOAuth2Manager } from "../utils/oauth";
  * Uses snoowrap library for Reddit API integration
  */
 export class RedditService {
-  private client: Snoowrap;
+  private client: Snoowrap | null = null;
   private config: RedditConfig;
   private oauthManager: RedditOAuth2Manager;
   private lastRequestTime = 0;
@@ -28,26 +28,41 @@ export class RedditService {
     this.config = config;
     this.oauthManager = new RedditOAuth2Manager(config);
 
-    // Initialize with temporary credentials - will be updated with OAuth2 tokens
-    this.client = new Snoowrap({
-      userAgent: config.userAgent,
-      clientId: config.clientId,
-      clientSecret: config.clientSecret,
-    });
-
-    this.client.config({
-      requestDelay: this.rateLimitDelay,
-      requestTimeout: 30000, // 30 second timeout
-      continueAfterRatelimitError: true,
-      retryErrorCodes: [502, 503, 504, 522],
-      maxRetryAttempts: 3,
-    });
-
     logger.info("Reddit service initialised", {
       subreddit: config.subreddit,
       postLimit: config.postLimit,
       userAgent: config.userAgent,
     });
+  }
+
+  /**
+   * Initialize the snoowrap client with OAuth2 token
+   * Called lazily when first API call is made
+   *
+   * @param accessToken - Valid OAuth2 access token
+   */
+  private initializeClient(accessToken: string): void {
+    if (!this.client) {
+      this.client = new Snoowrap({
+        userAgent: this.config.userAgent,
+        clientId: this.config.clientId,
+        clientSecret: this.config.clientSecret,
+        accessToken: accessToken,
+      });
+
+      this.client.config({
+        requestDelay: this.rateLimitDelay,
+        requestTimeout: 30000, // 30 second timeout
+        continueAfterRatelimitError: true,
+        retryErrorCodes: [502, 503, 504, 522],
+        maxRetryAttempts: 3,
+      });
+
+      logger.debug("Reddit client initialized with OAuth2 token");
+    } else {
+      // Update existing client with new token
+      this.client.accessToken = accessToken;
+    }
   }
 
   /**
@@ -69,8 +84,8 @@ export class RedditService {
         };
       }
 
-      // Update snoowrap client with access token
-      this.client.accessToken = tokenResult.data;
+      // Initialize client with access token
+      this.initializeClient(tokenResult.data);
 
       const postLimit = limit ?? this.config.postLimit;
 
@@ -79,7 +94,7 @@ export class RedditService {
         limit: postLimit,
       });
 
-      const subreddit = this.client.getSubreddit(this.config.subreddit);
+      const subreddit = this.client!.getSubreddit(this.config.subreddit);
       const submissions = await subreddit.getNew({ limit: postLimit });
 
       const posts: RedditPost[] = submissions.map((submission) =>
@@ -220,7 +235,18 @@ export class RedditService {
     try {
       logger.info("Testing Reddit connection");
 
-      const subreddit = this.client.getSubreddit(this.config.subreddit);
+      // Get valid access token and initialize client
+      const tokenResult = await this.oauthManager.getValidAccessToken();
+      if (!tokenResult.success) {
+        return {
+          success: false,
+          error: tokenResult.error,
+        };
+      }
+
+      this.initializeClient(tokenResult.data);
+
+      const subreddit = this.client!.getSubreddit(this.config.subreddit);
       await subreddit.getNew({ limit: 1 });
 
       logger.info("Reddit connection test successful", {
