@@ -253,6 +253,21 @@ export class RedditDiscordBot {
       // Fetch posts from Reddit
       const fetchResult = await this.redditService.fetchNewPosts();
       if (!fetchResult.success) {
+        // Check if this is an OAuth error
+        if (
+          fetchResult.error.code === "OAUTH_NO_TOKENS" ||
+          fetchResult.error.code === "OAUTH_REFRESH_ERROR" ||
+          fetchResult.error.code === "OAUTH_TOKEN_ERROR"
+        ) {
+          logger.warn("Skipping sync - OAuth2 not set up yet", {
+            error: fetchResult.error.message,
+            code: fetchResult.error.code,
+          });
+          stats.duration = Date.now() - startTime;
+          return { success: true, data: stats }; // Return success but with warning
+        }
+
+        // Other errors should still throw
         throw new Error(`Reddit fetch failed: ${fetchResult.error.message}`);
       }
 
@@ -436,9 +451,16 @@ export class RedditDiscordBot {
     // Test Reddit connection
     const redditTest = await this.redditService.testConnection();
     if (!redditTest.success) {
-      throw new Error(
-        `Reddit connection test failed: ${redditTest.error.message}`,
+      logger.warn(
+        "Reddit connection test failed - bot will start but may not function until OAuth2 is set up",
+        {
+          error: redditTest.error.message,
+          code: redditTest.error.code,
+        },
       );
+      // Don't throw error - allow bot to start for OAuth2 setup
+    } else {
+      logger.info("Reddit connection test successful");
     }
 
     // Test Discord connection
