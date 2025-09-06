@@ -17,6 +17,7 @@ interface TokenResponse {
   token_type: string;
   expires_in: number;
   scope: string;
+  refresh_token?: string; // Only present for authorization_code grant with duration=permanent
 }
 
 /**
@@ -190,7 +191,7 @@ export class RedditOAuth2Manager {
       );
 
       const tokenData: StoredTokenData = {
-        refreshToken: authCode, // Store auth code as refresh token initially
+        refreshToken: response.data.refresh_token || authCode, // Use refresh_token from response, fallback to auth code
         accessToken: response.data.access_token,
         expiresAt: Date.now() + response.data.expires_in * 1000,
         scope: response.data.scope,
@@ -255,15 +256,38 @@ export class RedditOAuth2Manager {
     const envRefreshToken = process.env.REDDIT_REFRESH_TOKEN;
     if (envRefreshToken) {
       logger.info("Loading Reddit tokens from environment variable");
-      return {
-        success: true,
-        data: {
-          refreshToken: envRefreshToken,
-          accessToken: "", // Will be refreshed
-          expiresAt: 0, // Force refresh
-          scope: "read",
-        },
-      };
+
+      // Check if this looks like an authorization code (long) vs refresh token (shorter)
+      // Authorization codes are typically 100+ characters, refresh tokens are shorter
+      if (envRefreshToken.length > 100) {
+        logger.info("Detected authorization code, will exchange for tokens");
+
+        // This is an authorization code, exchange it for tokens
+        const exchangeResult =
+          await this.exchangeCodeForTokens(envRefreshToken);
+        if (!exchangeResult.success) {
+          return {
+            success: false,
+            error: exchangeResult.error,
+          };
+        }
+
+        return {
+          success: true,
+          data: exchangeResult.data,
+        };
+      } else {
+        // This is already a refresh token
+        return {
+          success: true,
+          data: {
+            refreshToken: envRefreshToken,
+            accessToken: "", // Will be refreshed
+            expiresAt: 0, // Force refresh
+            scope: "read",
+          },
+        };
+      }
     }
 
     // Fallback to file-based storage (for local development)
