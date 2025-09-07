@@ -112,12 +112,19 @@ export class DiscordService {
         };
       }
 
-      // Add threading support if enabled and using forum channel
       if (this.config.enableThreading && this.config.isForumChannel) {
         payload.thread_name = this.generateThreadName(post);
+
+        // Apply Discord tags based on Reddit flair mapping
+        const appliedTags = this.mapFlairToDiscordTags(post);
+        if (appliedTags.length > 0) {
+          payload.applied_tags = appliedTags;
+        }
+
         logger.debug("Creating Discord thread for Reddit post", {
           postId: post.id,
           threadName: payload.thread_name,
+          appliedTags: payload.applied_tags,
           messageFormat,
         });
       }
@@ -234,22 +241,17 @@ export class DiscordService {
   private formatRedditPostAsNormalMessage(
     post: RedditPost,
   ): DiscordWebhookPayload {
-    // Handle media - prioritise full-size images over thumbnails
     const mediaInfo = this.getMediaInfo(post);
 
-    // Build the message content
     let content = "";
 
-    // Add flair tag if available
     if (post.link_flair_text) {
       content += `**[${post.link_flair_text}]** `;
     }
 
-    // Add the post title as a link to Reddit
     content += `**${post.title}**\n`;
     content += `🔗 <${post.permalink}>\n\n`;
 
-    // Add selftext if it's a text post
     if (post.selftext) {
       const truncatedText =
         post.selftext.length > 800
@@ -258,11 +260,9 @@ export class DiscordService {
       content += `${truncatedText}\n\n`;
     }
 
-    // Add post metadata
     content += `📍 **r/${post.subreddit}** • 👤 **u/${post.author}**\n`;
     content += `👍 ${post.ups} upvotes • 💬 ${post.num_comments} comments`;
 
-    // If we have an external link that's not an image, mention it
     if (post.url !== post.permalink && !mediaInfo.fullImage) {
       content += `\n🔗 [External link](${post.url})`;
     }
@@ -273,10 +273,7 @@ export class DiscordService {
       content,
     };
 
-    // Add image attachment if we have a full image URL
     if (mediaInfo.fullImage) {
-      // For normal messages, we can either include the image URL in content
-      // or use attachments. Discord will auto-embed images from URLs in content.
       payload.content += `\n\n${mediaInfo.fullImage}`;
     }
 
@@ -749,5 +746,39 @@ export class DiscordService {
       .trim();
 
     return threadName;
+  }
+
+  /**
+   * Map Reddit flair text to Discord tag IDs
+   * Uses the configured tag mapping to find matching Discord tags
+   *
+   * @param post - Reddit post with potential flair
+   * @returns Array of Discord tag IDs to apply (max 5)
+   * @private
+   */
+  private mapFlairToDiscordTags(post: RedditPost): string[] {
+    if (!this.config.tagMapping || !post.link_flair_text) {
+      return [];
+    }
+
+    const flairText = post.link_flair_text.trim();
+    const tagId = this.config.tagMapping[flairText];
+
+    if (tagId) {
+      logger.debug("Mapped Reddit flair to Discord tag", {
+        postId: post.id,
+        flairText,
+        tagId,
+      });
+      return [tagId];
+    }
+
+    logger.debug("No Discord tag mapping found for Reddit flair", {
+      postId: post.id,
+      flairText,
+      availableMappings: Object.keys(this.config.tagMapping),
+    });
+
+    return [];
   }
 }

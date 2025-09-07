@@ -123,6 +123,31 @@ function loadDiscordConfig(): DiscordConfig {
     );
   }
 
+  // Parse tag mapping from environment variable
+  let tagMapping: Record<string, string> | undefined;
+  if (process.env.DISCORD_TAG_MAPPING) {
+    try {
+      tagMapping = {};
+      const mappingPairs = process.env.DISCORD_TAG_MAPPING.split(",");
+      for (const pair of mappingPairs) {
+        const [flairText, tagId] = pair.split(":").map((s) => s.trim());
+        if (flairText && tagId) {
+          // Validate Discord tag ID format (should be a snowflake - numeric string)
+          if (!/^\d+$/.test(tagId)) {
+            throw new Error(
+              `Invalid Discord tag ID format: ${tagId}. Must be a numeric snowflake ID.`,
+            );
+          }
+          tagMapping[flairText] = tagId;
+        }
+      }
+    } catch (error) {
+      throw new Error(
+        `Invalid DISCORD_TAG_MAPPING format: ${error instanceof Error ? error.message : String(error)}. Expected format: "Flair1:123456,Flair2:789012"`,
+      );
+    }
+  }
+
   return {
     webhookUrl,
     messageFormat,
@@ -138,6 +163,7 @@ function loadDiscordConfig(): DiscordConfig {
       process.env.DISCORD_THREAD_NAME_MAX_LENGTH || "80",
       10,
     ),
+    tagMapping,
   };
 }
 

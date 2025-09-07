@@ -124,6 +124,8 @@ export interface DiscordWebhookPayload {
   tts?: boolean;
   /** Thread name for forum channels (creates new thread) */
   thread_name?: string;
+  /** Array of tag IDs to apply to forum channel threads (max 5) */
+  applied_tags?: string[];
 }
 
 /**
@@ -181,6 +183,8 @@ export interface DiscordConfig {
   isForumChannel?: boolean;
   /** Maximum length for thread names */
   threadNameMaxLength?: number;
+  /** Mapping of Reddit flair text to Discord tag IDs */
+  tagMapping?: Record<string, string>;
 }
 
 /**
