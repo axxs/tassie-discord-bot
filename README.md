@@ -1,4 +1,4 @@
-# Tassie Discord Bot 🇦🇺
+# Tassie Discord Bot
 
 A production-ready Node.js bot that monitors the r/tasmania subreddit and forwards new posts to Discord via webhooks. Built with TypeScript, featuring robust error handling, rate limiting, and comprehensive logging.
 
@@ -33,8 +33,8 @@ Before setting up the bot, ensure you have:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/axxs/tassie-reddit-bot.git
-cd tassie-reddit-bot
+git clone https://github.com/axxs/tassie-discord-bot.git
+cd tassie-discord-bot
 ```
 
 ### 2. Install Dependencies
@@ -94,7 +94,7 @@ The bot uses secure OAuth2 authentication for Reddit API access.
    - Click "Create App" or "Create Another App"
    - Choose **"web app"** as the app type ⚠️ **Important: NOT "script"**
    - Fill in the form:
-     - **Name**: `Tassie Reddit Bot` (or your preferred name)
+     - **Name**: `Tassie Discord Bot` (or your preferred name)
      - **Description**: `Bot for monitoring r/tasmania`
      - **About URL**: Leave blank or add your GitHub repo
      - **Redirect URI**: `http://localhost:8080/auth/callback` ⚠️ **Must match exactly**
@@ -109,7 +109,7 @@ The bot uses secure OAuth2 authentication for Reddit API access.
    REDDIT_CLIENT_ID=your_client_id_here
    REDDIT_CLIENT_SECRET=your_client_secret_here
    REDDIT_REDIRECT_URI=http://localhost:8080/auth/callback
-   REDDIT_USER_AGENT=TassieRedditBot/1.0.0 by u/your-username
+   REDDIT_USER_AGENT=TassieDiscordBot/1.0.0 by u/your-username
    REDDIT_SUBREDDIT=tasmania
    ```
 
@@ -141,7 +141,7 @@ The bot uses secure OAuth2 authentication for Reddit API access.
 2. **Update .env File**:
    ```env
    DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN
-   DISCORD_DEFAULT_USERNAME=Tassie Reddit Bot
+   DISCORD_DEFAULT_USERNAME=Tassie Discord Bot
    ```
 
 ### Discord Forum Tag Mapping (Optional)
@@ -234,7 +234,7 @@ SCHEDULE_TIMEZONE=Australia/Hobart
 3. **View logs**:
 
    ```bash
-   docker-compose logs -f tassie-reddit-bot
+   docker-compose logs -f tassie-discord-bot
    ```
 
 4. **Stop the bot**:
@@ -246,7 +246,7 @@ SCHEDULE_TIMEZONE=Australia/Hobart
 
 ```bash
 # Build the image
-docker build -t tassie-reddit-bot .
+docker build -t tassie-discord-bot .
 
 # Run with environment file and persistent volumes
 docker run -d \
@@ -256,7 +256,7 @@ docker run -d \
   -v $(pwd)/logs:/app/logs \
   -p 3000:3000 \
   --restart unless-stopped \
-  tassie-reddit-bot
+  tassie-discord-bot
 
 # View logs
 docker logs -f tassie-bot
@@ -296,7 +296,7 @@ Ensure your repository contains:
    - Choose **"Public Repository"** or **"Private Repository"**
 
 3. **Configure Repository**
-   - **Repository URL**: `https://github.com/your-username/tassie-reddit-bot.git`
+   - **Repository URL**: `https://github.com/your-username/tassie-discord-bot.git`
    - **Branch**: `main` (or your default branch)
    - **Build Pack**: Select **"Dockerfile"**
    - **Dockerfile Location**: Leave as `Dockerfile` (root directory)
@@ -338,8 +338,8 @@ LOG_LEVEL=info
 SCHEDULE_CRON=*/15 * * * *
 SCHEDULE_TIMEZONE=Australia/Hobart
 REDDIT_POST_LIMIT=25
-REDDIT_USER_AGENT=TassieRedditBot/1.0.0 by u/your-username
-DISCORD_DEFAULT_USERNAME=Tassie Reddit Bot
+REDDIT_USER_AGENT=TassieDiscordBot/1.0.0 by u/your-username
+DISCORD_DEFAULT_USERNAME=Tassie Discord Bot
 DISCORD_MESSAGE_FORMAT=embed
 DISCORD_ENABLE_THREADING=true
 DISCORD_FORUM_CHANNEL=true
@@ -499,13 +499,13 @@ Coolify will automatically detect the health check from the Dockerfile, but you 
 
 ```bash
 # View container logs
-coolify logs tassie-reddit-bot
+coolify logs tassie-discord-bot
 
 # Check container status
-coolify status tassie-reddit-bot
+coolify status tassie-discord-bot
 
 # Restart application
-coolify restart tassie-reddit-bot
+coolify restart tassie-discord-bot
 ```
 
 #### Performance Optimisation
@@ -572,7 +572,7 @@ The bot exposes a health check endpoint for monitoring:
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Reddit API    │    │  Tassie Reddit   │    │   Discord API   │
+│   Reddit API    │    │  Tassie Discord   │    │   Discord API   │
 │   (r/tasmania)  │◄──►│      Bot         │───►│   (Webhook)     │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
                                │
@@ -609,7 +609,7 @@ The bot exposes a health check endpoint for monitoring:
 
    ```bash
    git clone <repository-url>
-   cd tassie-reddit-bot
+   cd tassie-discord-bot
    npm install
    ```
 
@@ -763,7 +763,7 @@ If you encounter issues:
 
 ## 🤝 Contributing
 
-We welcome contributions to improve the Tassie Reddit Bot!
+We welcome contributions to improve the Tassie Discord Bot!
 
 ### Development Workflow
 
@@ -811,4 +811,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-Built with ❤️ for the Tasmanian Reddit community
+Built with ❤️ for the Tassie Discord and Tasmanian Reddit communities!
