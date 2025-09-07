@@ -1,4 +1,4 @@
-# Tassie Reddit Bot 🇦🇺
+# Tassie Discord Bot 🇦🇺
 
 A production-ready Node.js bot that monitors the r/tasmania subreddit and forwards new posts to Discord via webhooks. Built with TypeScript, featuring robust error handling, rate limiting, and comprehensive logging.
 
