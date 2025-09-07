@@ -16,7 +16,6 @@ import {
 } from "../types";
 import { logger } from "../utils/logger";
 
-// Load environment variables from .env file
 dotenv.config();
 
 /**
@@ -98,7 +97,6 @@ function loadDiscordConfig(): DiscordConfig {
     );
   }
 
-  // Validate webhook URL format
   try {
     const url = new URL(webhookUrl);
     if (
@@ -113,7 +111,6 @@ function loadDiscordConfig(): DiscordConfig {
     );
   }
 
-  // Validate message format
   const messageFormat = (process.env.DISCORD_MESSAGE_FORMAT || "embed") as
     | "embed"
     | "normal";
@@ -123,7 +120,6 @@ function loadDiscordConfig(): DiscordConfig {
     );
   }
 
-  // Parse tag mapping from environment variable
   let tagMapping: Record<string, string> | undefined;
   if (process.env.DISCORD_TAG_MAPPING) {
     try {
@@ -175,7 +171,6 @@ function loadDiscordConfig(): DiscordConfig {
 function loadLoggingConfig(): LoggingConfig {
   const level = process.env.LOG_LEVEL || DEFAULT_VALUES.LOG_LEVEL;
 
-  // Validate log level
   const validLevels = ["error", "warn", "info", "debug"];
   if (!validLevels.includes(level)) {
     throw new Error(
@@ -263,16 +258,12 @@ export async function getConfig(): Promise<Result<Config>> {
   try {
     logger.info("Loading application configuration");
 
-    // Validate required environment variables first
     validateRequiredEnvVars();
 
-    // Load individual configuration sections
     const reddit = loadRedditConfig();
     const discord = loadDiscordConfig();
     const logging = loadLoggingConfig();
     const schedule = loadScheduleConfig();
-
-    // Validate environment
     const environment = process.env.ENVIRONMENT || DEFAULT_VALUES.ENVIRONMENT;
     if (environment !== "development" && environment !== "production") {
       throw new Error(
@@ -280,12 +271,10 @@ export async function getConfig(): Promise<Result<Config>> {
       );
     }
 
-    // Resolve storage file path
     const storageFilePath = path.resolve(
       process.env.STORAGE_FILE_PATH || DEFAULT_VALUES.STORAGE_FILE_PATH,
     );
 
-    // Ensure storage directory exists
     await ensureStorageDirectory(storageFilePath);
 
     const config: Config = {
@@ -359,7 +348,6 @@ export async function loadConfig(): Promise<Config> {
 export async function getConfigForEnvironment(
   env: "development" | "production",
 ): Promise<Result<Config>> {
-  // Temporarily override environment
   const originalEnv = process.env.ENVIRONMENT;
   process.env.ENVIRONMENT = env;
 
@@ -367,7 +355,6 @@ export async function getConfigForEnvironment(
     const result = await getConfig();
     return result;
   } finally {
-    // Restore original environment
     if (originalEnv) {
       process.env.ENVIRONMENT = originalEnv;
     } else {
@@ -385,7 +372,6 @@ export async function getConfigForEnvironment(
  */
 export function validateConfig(config: Config): Result<boolean> {
   try {
-    // Validate Reddit configuration
     if (!config.reddit.clientId || !config.reddit.clientSecret) {
       throw new Error("Reddit client ID and secret are required");
     }
@@ -402,7 +388,6 @@ export function validateConfig(config: Config): Result<boolean> {
       throw new Error("Reddit post limit must be between 1 and 100");
     }
 
-    // Validate Discord configuration
     if (!config.discord.webhookUrl) {
       throw new Error("Discord webhook URL is required");
     }
@@ -413,13 +398,11 @@ export function validateConfig(config: Config): Result<boolean> {
       throw new Error("Discord webhook URL is invalid");
     }
 
-    // Validate logging configuration
     const validLogLevels = ["error", "warn", "info", "debug"];
     if (!validLogLevels.includes(config.logging.level)) {
       throw new Error("Invalid logging level");
     }
 
-    // Validate environment
     if (!["development", "production"].includes(config.environment)) {
       throw new Error("Environment must be 'development' or 'production'");
     }

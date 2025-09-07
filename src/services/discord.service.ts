@@ -115,7 +115,6 @@ export class DiscordService {
       if (this.config.enableThreading && this.config.isForumChannel) {
         payload.thread_name = this.generateThreadName(post);
 
-        // Apply Discord tags based on Reddit flair mapping
         const appliedTags = this.mapFlairToDiscordTags(post);
         if (appliedTags.length > 0) {
           payload.applied_tags = appliedTags;
@@ -196,7 +195,6 @@ export class DiscordService {
         errors.push(result.error);
       }
 
-      // Add delay between posts to avoid overwhelming Discord
       if (posts.length > 1) {
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
@@ -287,13 +285,10 @@ export class DiscordService {
    * @returns Discord embed object
    */
   private formatRedditPostAsEmbed(post: RedditPost): DiscordEmbed {
-    // Determine embed colour based on flair
     const color = this.getEmbedColor(post.link_flair_text);
 
-    // Format description - use selftext for text posts, or link description
     let description = "";
     if (post.selftext) {
-      // Truncate selftext if too long (Discord embed description limit is 4096)
       description =
         post.selftext.length > 500
           ? `${post.selftext.substring(0, 500)}...`
@@ -302,10 +297,8 @@ export class DiscordService {
       description = `🔗 [Link to external content](${post.url})`;
     }
 
-    // Handle media - prioritise full-size images over thumbnails
     const mediaInfo = this.getMediaInfo(post);
 
-    // Create embed
     const embed: DiscordEmbed = {
       title:
         post.title.length > 256
@@ -328,16 +321,11 @@ export class DiscordService {
       },
     };
 
-    // Add media based on type and availability
     if (mediaInfo.fullImage) {
-      // Use full-size image for better display
       embed.image = { url: mediaInfo.fullImage };
     } else if (mediaInfo.thumbnail) {
-      // Fallback to thumbnail if no full image available
       embed.thumbnail = { url: mediaInfo.thumbnail };
     }
-
-    // Add flair as a field if present
     if (post.link_flair_text) {
       embed.fields = [
         {
@@ -395,7 +383,6 @@ export class DiscordService {
       });
     }
 
-    // Always check for valid thumbnail as fallback
     if (this.isValidImageUrl(post.thumbnail)) {
       result.thumbnail = post.thumbnail;
     }
@@ -419,7 +406,6 @@ export class DiscordService {
       const pathname = parsedUrl.pathname.toLowerCase();
       const hostname = parsedUrl.hostname.toLowerCase();
 
-      // Common image file extensions
       const imageExtensions = [
         ".jpg",
         ".jpeg",
@@ -434,27 +420,21 @@ export class DiscordService {
         return true;
       }
 
-      // Reddit image hosting
       if (hostname.includes("i.redd.it")) {
         return true;
       }
 
-      // Imgur variations
       if (hostname.includes("i.imgur.com") || hostname.includes("imgur.com")) {
         return true;
       }
-
-      // Reddit preview URLs (common for cross-posts)
       if (hostname.includes("preview.redd.it")) {
         return true;
       }
 
-      // Reddit external preview URLs
       if (hostname.includes("external-preview.redd.it")) {
         return true;
       }
 
-      // Other common image hosts
       if (
         hostname.includes("gyazo.com") ||
         hostname.includes("postimg.cc") ||
@@ -520,7 +500,6 @@ export class DiscordService {
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
-        // Don't retry on client errors (4xx)
         if (axios.isAxiosError(error) && error.response?.status) {
           const status = error.response.status;
           if (status >= 400 && status < 500) {
@@ -533,7 +512,6 @@ export class DiscordService {
           }
         }
 
-        // Log retry attempt
         if (attempt < this.maxRetries) {
           const delay = this.calculateRetryDelay(attempt);
           logger.warn("Discord webhook failed - retrying", {
@@ -728,22 +706,14 @@ export class DiscordService {
       threadName += `[${post.link_flair_text}] `;
     }
 
-    // Add the post title
     threadName += post.title;
 
-    // Note: Removed author suffix as it's redundant with embed author info
-
-    // Truncate to Discord's thread name limit
     const maxLength = this.config.threadNameMaxLength || 80;
     if (threadName.length > maxLength) {
       threadName = threadName.substring(0, maxLength - 3) + "...";
     }
 
-    // Clean up any characters that might cause issues
-    threadName = threadName
-      .replace(/\n/g, " ") // Replace newlines with spaces
-      .replace(/\s+/g, " ") // Replace multiple spaces with single space
-      .trim();
+    threadName = threadName.replace(/\n/g, " ").replace(/\s+/g, " ").trim();
 
     return threadName;
   }

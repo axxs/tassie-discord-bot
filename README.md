@@ -7,8 +7,8 @@ A production-ready Node.js bot that monitors the r/tasmania subreddit and forwar
 - **Automated Monitoring**: Continuously monitors r/tasmania for new posts
 - **Smart Filtering**: Prevents duplicate posts with intelligent storage tracking
 - **Rich Discord Embeds**: Beautiful Discord messages with full-size images, metadata, and colour-coded flairs
-- **Perfect Tag Alignment**: Reddit flairs automatically become Discord tags (Video → [Video], Question → [Question])
-- **Enhanced Media Display**: Shows full-size images instead of tiny thumbnails for better visual impact
+- **Discord Forum Tags**: Reddit flairs automatically map to Discord forum channel tags when configured
+- **Flexible Message Formats**: Choose between rich embeds or plain messages with full-size images
 - **Production Ready**: Docker support, health checks, and comprehensive error handling
 - **Flexible Scheduling**: Configurable cron-based scheduling with timezone support
 - **Discord Threading**: Optional thread creation with clean titles (no redundant usernames)
@@ -87,7 +87,7 @@ npm start
 
 ### Reddit API Setup (OAuth2)
 
-The bot now uses secure OAuth2 authentication instead of username/password.
+The bot uses secure OAuth2 authentication for Reddit API access.
 
 1. **Create Reddit App**:
    - Go to [Reddit App Preferences](https://www.reddit.com/prefs/apps)
@@ -144,6 +144,34 @@ The bot now uses secure OAuth2 authentication instead of username/password.
    DISCORD_DEFAULT_USERNAME=Tassie Reddit Bot
    ```
 
+### Discord Forum Tag Mapping (Optional)
+
+For Discord forum channels, you can automatically map Reddit flairs to Discord tags:
+
+1. **Get Discord Tag IDs**:
+   - Right-click on your Discord forum channel
+   - Select **"Edit Channel"** → **"Tags"**
+   - Copy the numeric ID for each tag you want to use
+
+2. **Configure Tag Mapping**:
+
+   ```env
+   # Map Reddit flairs to Discord forum tag IDs
+   DISCORD_TAG_MAPPING=Video:1234567890123456789,Question:9876543210987654321,News:1111222233334444555
+
+   # Format: FlairText:TagID,FlairText:TagID
+   # - Use exact Reddit flair text (case-sensitive)
+   # - Tag IDs must be numeric Discord snowflake IDs
+   # - Leave empty to disable automatic tagging
+   ```
+
+3. **Message Format Options**:
+   ```env
+   # Choose message format
+   DISCORD_MESSAGE_FORMAT=embed    # Rich embeds (default)
+   # DISCORD_MESSAGE_FORMAT=normal # Plain messages with full-size images
+   ```
+
 ### Scheduling Configuration
 
 Configure how often the bot checks for new posts:
@@ -181,6 +209,8 @@ SCHEDULE_TIMEZONE=Australia/Hobart
 | `DISCORD_DEFAULT_AVATAR_URL` | ❌       | -                       | Custom webhook avatar URL                   |
 | `DISCORD_ENABLE_THREADING`   | ❌       | `false`                 | Enable Discord thread creation              |
 | `DISCORD_FORUM_CHANNEL`      | ❌       | `false`                 | Whether Discord channel is a forum          |
+| `DISCORD_TAG_MAPPING`        | ❌       | -                       | Map Reddit flairs to Discord forum tag IDs  |
+| `DISCORD_MESSAGE_FORMAT`     | ❌       | `embed`                 | Message format: 'embed' or 'normal'         |
 | `HEALTH_CHECK_PORT`          | ❌       | `3000`                  | Port for health check endpoint              |
 | `STORAGE_FILE_PATH`          | ❌       | `data/posted-ids.json`  | Path to post IDs storage file               |
 
@@ -284,7 +314,7 @@ Ensure your repository contains:
 
 #### 4. Environment Variables Configuration
 
-⚠️ **Important**: The bot now uses OAuth2 authentication, so you need to set up Reddit authentication differently for production deployment.
+⚠️ **Important**: The bot uses OAuth2 authentication for secure Reddit API access.
 
 In Coolify's **Environment Variables** section, add all required variables:
 
@@ -310,6 +340,10 @@ SCHEDULE_TIMEZONE=Australia/Hobart
 REDDIT_POST_LIMIT=25
 REDDIT_USER_AGENT=TassieRedditBot/1.0.0 by u/your-username
 DISCORD_DEFAULT_USERNAME=Tassie Reddit Bot
+DISCORD_MESSAGE_FORMAT=embed
+DISCORD_ENABLE_THREADING=true
+DISCORD_FORUM_CHANNEL=true
+DISCORD_TAG_MAPPING=Video:1234567890,Question:9876543210,News:1111222233
 NODE_ENV=production
 ```
 
@@ -331,37 +365,9 @@ The bot requires persistent storage for post tracking and logs. In Coolify, conf
 
 #### 6. OAuth2 Setup for Production
 
-**⚠️ Critical**: OAuth2 requires special setup for production deployment. You have two options:
+**⚠️ Critical**: OAuth2 authentication requires Reddit authorization before the bot can fetch posts.
 
-##### Option A: Use Helper Script (Requires Separate Reddit App)
-
-⚠️ **Important**: This option requires creating a separate Reddit app for local development since Reddit apps are tied to specific redirect URIs.
-
-1. **Create a separate Reddit app for local setup**:
-   - Go to [Reddit App Preferences](https://www.reddit.com/prefs/apps)
-   - Create another app with redirect URI: `http://localhost:8080/auth/callback`
-   - Use different credentials for local OAuth2 setup
-
-2. **Run local OAuth2 setup**:
-
-   ```bash
-   # Use the LOCAL app credentials temporarily
-   REDDIT_CLIENT_ID=local_app_client_id \
-   REDDIT_CLIENT_SECRET=local_app_client_secret \
-   REDDIT_REDIRECT_URI=http://localhost:8080/auth/callback \
-   node scripts/setup-oauth.js
-   ```
-
-3. **Copy refresh token to production**:
-   - Copy the refresh token from the setup output
-   - In Coolify, add environment variable with your **production** app credentials:
-     ```env
-     REDDIT_REFRESH_TOKEN=refresh_token_from_local_setup
-     ```
-
-##### Option B: Direct Production OAuth2 Flow
-
-**New**: The bot now includes a built-in OAuth2 callback handler! Perfect for Coolify deployments.
+The bot includes a built-in OAuth2 callback handler for production deployments.
 
 1. **Update Reddit app redirect URI**:
    - Go to [Reddit App Preferences](https://www.reddit.com/prefs/apps)
@@ -392,13 +398,6 @@ The bot requires persistent storage for post tracking and logs. In Coolify, conf
 5. **Verify setup**:
    - Check application logs for "Successfully refreshed OAuth2 access token"
    - The bot should now be able to fetch posts from Reddit
-
-##### Which Option to Choose?
-
-- **Option A**: Requires creating separate Reddit apps for local/production
-- **Option B**: **Recommended** - Uses single Reddit app, simpler setup, built-in callback handler
-
-> **💡 Production Tip**: Option B is the recommended approach for Coolify deployments since it uses your production Reddit app directly and the bot handles the OAuth2 callback automatically. No need for separate apps or local development setup.
 
 #### 7. Health Check Configuration
 
