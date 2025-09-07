@@ -151,11 +151,18 @@ export interface RedditConfig {
 }
 
 /**
+ * Discord message format options
+ */
+export type DiscordMessageFormat = "embed" | "normal";
+
+/**
  * Discord webhook configuration
  */
 export interface DiscordConfig {
   /** Discord webhook URL */
   webhookUrl: string;
+  /** Message format: 'embed' (rich cards) or 'normal' (plain messages) */
+  messageFormat?: DiscordMessageFormat;
   /** Default username for webhook messages */
   defaultUsername?: string;
   /** Default avatar URL for webhook messages */

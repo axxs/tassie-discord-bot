@@ -113,8 +113,19 @@ function loadDiscordConfig(): DiscordConfig {
     );
   }
 
+  // Validate message format
+  const messageFormat = (process.env.DISCORD_MESSAGE_FORMAT || "embed") as
+    | "embed"
+    | "normal";
+  if (messageFormat !== "embed" && messageFormat !== "normal") {
+    throw new Error(
+      `Invalid DISCORD_MESSAGE_FORMAT: ${messageFormat}. Must be 'embed' or 'normal'`,
+    );
+  }
+
   return {
     webhookUrl,
+    messageFormat,
     defaultUsername: process.env.DISCORD_DEFAULT_USERNAME,
     defaultAvatarUrl: process.env.DISCORD_DEFAULT_AVATAR_URL,
     testTitle: process.env.DISCORD_TEST_TITLE,

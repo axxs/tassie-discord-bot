@@ -89,7 +89,7 @@ export class DiscordService {
   }
 
   /**
-   * Send a Reddit post as a Discord embed
+   * Send a Reddit post to Discord (embed or normal message format)
    *
    * @param post - Reddit post to send
    * @returns Promise resolving to Result indicating success or failure
@@ -98,12 +98,19 @@ export class DiscordService {
     try {
       await this.enforceRateLimit();
 
-      const embed = this.formatRedditPostAsEmbed(post);
-      const payload: DiscordWebhookPayload = {
-        username: this.config.defaultUsername || "Reddit Bot",
-        avatar_url: this.config.defaultAvatarUrl,
-        embeds: [embed],
-      };
+      const messageFormat = this.config.messageFormat || "embed";
+      let payload: DiscordWebhookPayload;
+
+      if (messageFormat === "normal") {
+        payload = this.formatRedditPostAsNormalMessage(post);
+      } else {
+        const embed = this.formatRedditPostAsEmbed(post);
+        payload = {
+          username: this.config.defaultUsername || "Reddit Bot",
+          avatar_url: this.config.defaultAvatarUrl,
+          embeds: [embed],
+        };
+      }
 
       // Add threading support if enabled and using forum channel
       if (this.config.enableThreading && this.config.isForumChannel) {
@@ -111,6 +118,7 @@ export class DiscordService {
         logger.debug("Creating Discord thread for Reddit post", {
           postId: post.id,
           threadName: payload.thread_name,
+          messageFormat,
         });
       }
 
@@ -122,6 +130,7 @@ export class DiscordService {
           title: post.title,
           author: post.author,
           subreddit: post.subreddit,
+          messageFormat,
         });
       }
 
@@ -136,6 +145,7 @@ export class DiscordService {
           postId: post.id,
           postTitle: post.title,
           webhookUrl: this.maskWebhookUrl(this.config.webhookUrl),
+          messageFormat: this.config.messageFormat || "embed",
         },
       };
 
@@ -213,6 +223,64 @@ export class DiscordService {
         error: botError,
       };
     }
+  }
+
+  /**
+   * Format a Reddit post as a normal Discord message
+   *
+   * @param post - Reddit post to format
+   * @returns Discord webhook payload for normal message
+   */
+  private formatRedditPostAsNormalMessage(
+    post: RedditPost,
+  ): DiscordWebhookPayload {
+    // Handle media - prioritise full-size images over thumbnails
+    const mediaInfo = this.getMediaInfo(post);
+
+    // Build the message content
+    let content = "";
+
+    // Add flair tag if available
+    if (post.link_flair_text) {
+      content += `**[${post.link_flair_text}]** `;
+    }
+
+    // Add the post title as a link to Reddit
+    content += `**${post.title}**\n`;
+    content += `🔗 <${post.permalink}>\n\n`;
+
+    // Add selftext if it's a text post
+    if (post.selftext) {
+      const truncatedText =
+        post.selftext.length > 800
+          ? `${post.selftext.substring(0, 800)}...`
+          : post.selftext;
+      content += `${truncatedText}\n\n`;
+    }
+
+    // Add post metadata
+    content += `📍 **r/${post.subreddit}** • 👤 **u/${post.author}**\n`;
+    content += `👍 ${post.ups} upvotes • 💬 ${post.num_comments} comments`;
+
+    // If we have an external link that's not an image, mention it
+    if (post.url !== post.permalink && !mediaInfo.fullImage) {
+      content += `\n🔗 [External link](${post.url})`;
+    }
+
+    const payload: DiscordWebhookPayload = {
+      username: this.config.defaultUsername || "Reddit Bot",
+      avatar_url: this.config.defaultAvatarUrl,
+      content,
+    };
+
+    // Add image attachment if we have a full image URL
+    if (mediaInfo.fullImage) {
+      // For normal messages, we can either include the image URL in content
+      // or use attachments. Discord will auto-embed images from URLs in content.
+      payload.content += `\n\n${mediaInfo.fullImage}`;
+    }
+
+    return payload;
   }
 
   /**
@@ -351,22 +419,52 @@ export class DiscordService {
 
     try {
       const parsedUrl = new URL(url);
+      const pathname = parsedUrl.pathname.toLowerCase();
+      const hostname = parsedUrl.hostname.toLowerCase();
 
       // Common image file extensions
-      const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
-      const pathname = parsedUrl.pathname.toLowerCase();
+      const imageExtensions = [
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".webp",
+        ".bmp",
+        ".svg",
+      ];
 
       if (imageExtensions.some((ext) => pathname.endsWith(ext))) {
         return true;
       }
 
       // Reddit image hosting
-      if (parsedUrl.hostname.includes("i.redd.it")) {
+      if (hostname.includes("i.redd.it")) {
         return true;
       }
 
-      // Imgur direct links
-      if (parsedUrl.hostname.includes("i.imgur.com")) {
+      // Imgur variations
+      if (hostname.includes("i.imgur.com") || hostname.includes("imgur.com")) {
+        return true;
+      }
+
+      // Reddit preview URLs (common for cross-posts)
+      if (hostname.includes("preview.redd.it")) {
+        return true;
+      }
+
+      // Reddit external preview URLs
+      if (hostname.includes("external-preview.redd.it")) {
+        return true;
+      }
+
+      // Other common image hosts
+      if (
+        hostname.includes("gyazo.com") ||
+        hostname.includes("postimg.cc") ||
+        hostname.includes("ibb.co") ||
+        hostname.includes("flickr.com") ||
+        hostname.includes("photobucket.com")
+      ) {
         return true;
       }
 
@@ -532,25 +630,46 @@ export class DiscordService {
     try {
       logger.info("Testing Discord webhook connection");
 
-      const testPayload: DiscordWebhookPayload = {
-        username: this.config.defaultUsername || "Reddit Bot",
-        avatar_url: this.config.defaultAvatarUrl,
-        embeds: [
-          {
-            title: this.config.testTitle || "🏝️ G'day Tassie!",
-            description:
-              this.config.testMessage ||
-              "Your friendly Reddit bot is now connected and ready to share the latest happenings from r/tasmania! I'll keep you updated with interesting posts from our beautiful island community. 🦘",
-            color: DISCORD_COLORS.ANNOUNCEMENT,
-            timestamp: new Date().toISOString(),
-            footer: {
-              text:
-                this.config.testFooter ||
-                "Ready to share Tasmania's stories with you!",
+      const messageFormat = this.config.messageFormat || "embed";
+      let testPayload: DiscordWebhookPayload;
+
+      if (messageFormat === "normal") {
+        // Normal message format test
+        const testTitle = this.config.testTitle || "🏝️ G'day Tassie!";
+        const testMessage =
+          this.config.testMessage ||
+          "Your friendly Reddit bot is now connected and ready to share the latest happenings from r/tasmania! I'll keep you updated with interesting posts from our beautiful island community. 🦘";
+        const testFooter =
+          this.config.testFooter ||
+          "Ready to share Tasmania's stories with you!";
+
+        testPayload = {
+          username: this.config.defaultUsername || "Reddit Bot",
+          avatar_url: this.config.defaultAvatarUrl,
+          content: `**${testTitle}**\n\n${testMessage}\n\n*${testFooter}*`,
+        };
+      } else {
+        // Embed format test
+        testPayload = {
+          username: this.config.defaultUsername || "Reddit Bot",
+          avatar_url: this.config.defaultAvatarUrl,
+          embeds: [
+            {
+              title: this.config.testTitle || "🏝️ G'day Tassie!",
+              description:
+                this.config.testMessage ||
+                "Your friendly Reddit bot is now connected and ready to share the latest happenings from r/tasmania! I'll keep you updated with interesting posts from our beautiful island community. 🦘",
+              color: DISCORD_COLORS.ANNOUNCEMENT,
+              timestamp: new Date().toISOString(),
+              footer: {
+                text:
+                  this.config.testFooter ||
+                  "Ready to share Tasmania's stories with you!",
+              },
             },
-          },
-        ],
-      };
+          ],
+        };
+      }
 
       // Add thread_name for forum channels
       if (this.config.enableThreading && this.config.isForumChannel) {
