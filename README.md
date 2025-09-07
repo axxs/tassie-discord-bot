@@ -318,18 +318,16 @@ NODE_ENV=production
 The bot requires persistent storage for post tracking and logs. In Coolify, configure volumes in the **Storage** section:
 
 1. **Data Volume** (required):
-   - **Volume Name**: `tassie-bot-data`
-   - **Source Path**: `/data` (on host)
+   - **Volume Name**: `tassie-data`
+   - **Source Path**: Leave empty
    - **Destination Path**: `/app/data` (in container)
    - **Purpose**: Stores processed post IDs and OAuth tokens
 
 2. **Logs Volume** (optional):
-   - **Volume Name**: `tassie-bot-logs`
-   - **Source Path**: `/logs` (on host)
+   - **Volume Name**: `tassie-logs`
+   - **Source Path**: Leave empty
    - **Destination Path**: `/app/logs` (in container)
    - **Purpose**: Application logs with rotation
-
-**Important**: The container expects data at `/app/data`, so ensure the destination path is exactly `/app/data` in your Coolify volume configuration.
 
 #### 6. OAuth2 Setup for Production
 
