@@ -6,9 +6,13 @@ A production-ready Node.js bot that monitors the r/tasmania subreddit and forwar
 
 - **Automated Monitoring**: Continuously monitors r/tasmania for new posts
 - **Smart Filtering**: Prevents duplicate posts with intelligent storage tracking
-- **Rich Discord Embeds**: Beautiful Discord messages with thumbnails, metadata, and colour-coded flairs
+- **Rich Discord Embeds**: Beautiful Discord messages with full-size images, metadata, and colour-coded flairs
+- **Perfect Tag Alignment**: Reddit flairs automatically become Discord tags (Video → [Video], Question → [Question])
+- **Enhanced Media Display**: Shows full-size images instead of tiny thumbnails for better visual impact
 - **Production Ready**: Docker support, health checks, and comprehensive error handling
 - **Flexible Scheduling**: Configurable cron-based scheduling with timezone support
+- **Discord Threading**: Optional thread creation with clean titles (no redundant usernames)
+- **OAuth2 Security**: Secure Reddit authentication without storing passwords
 - **Rate Limiting**: Respects Reddit and Discord API limits
 - **Comprehensive Logging**: Structured logging with rotation and different levels
 - **Type Safety**: Full TypeScript implementation with strict typing
@@ -159,20 +163,26 @@ SCHEDULE_TIMEZONE=Australia/Hobart
 
 ### Environment Variables Reference
 
-| Variable               | Required | Default                 | Description                              |
-| ---------------------- | -------- | ----------------------- | ---------------------------------------- |
-| `REDDIT_CLIENT_ID`     | ✅       | -                       | Reddit app client ID                     |
-| `REDDIT_CLIENT_SECRET` | ✅       | -                       | Reddit app client secret                 |
-| `REDDIT_USERNAME`      | ✅       | -                       | Reddit account username                  |
-| `REDDIT_PASSWORD`      | ✅       | -                       | Reddit account password                  |
-| `REDDIT_SUBREDDIT`     | ✅       | -                       | Subreddit to monitor (without r/)        |
-| `DISCORD_WEBHOOK_URL`  | ✅       | -                       | Discord webhook URL                      |
-| `REDDIT_USER_AGENT`    | ❌       | `TassieRedditBot/1.0.0` | Reddit API user agent                    |
-| `REDDIT_POST_LIMIT`    | ❌       | `25`                    | Posts to fetch per check (1-100)         |
-| `SCHEDULE_CRON`        | ❌       | `*/15 * * * *`          | Cron expression for scheduling           |
-| `SCHEDULE_TIMEZONE`    | ❌       | `Australia/Hobart`      | Timezone for scheduling                  |
-| `LOG_LEVEL`            | ❌       | `info`                  | Logging level (error, warn, info, debug) |
-| `ENVIRONMENT`          | ❌       | `production`            | Environment (development/production)     |
+| Variable                     | Required | Default                 | Description                                 |
+| ---------------------------- | -------- | ----------------------- | ------------------------------------------- |
+| `REDDIT_CLIENT_ID`           | ✅       | -                       | Reddit app client ID                        |
+| `REDDIT_CLIENT_SECRET`       | ✅       | -                       | Reddit app client secret                    |
+| `REDDIT_REDIRECT_URI`        | ✅       | -                       | OAuth2 redirect URI (must match Reddit app) |
+| `REDDIT_REFRESH_TOKEN`       | ✅       | -                       | OAuth2 refresh token or authorization code  |
+| `REDDIT_SUBREDDIT`           | ✅       | -                       | Subreddit to monitor (without r/)           |
+| `DISCORD_WEBHOOK_URL`        | ✅       | -                       | Discord webhook URL                         |
+| `REDDIT_USER_AGENT`          | ❌       | `TassieRedditBot/1.0.0` | Reddit API user agent                       |
+| `REDDIT_POST_LIMIT`          | ❌       | `25`                    | Posts to fetch per check (1-100)            |
+| `SCHEDULE_CRON`              | ❌       | `*/15 * * * *`          | Cron expression for scheduling              |
+| `SCHEDULE_TIMEZONE`          | ❌       | `Australia/Hobart`      | Timezone for scheduling                     |
+| `LOG_LEVEL`                  | ❌       | `info`                  | Logging level (error, warn, info, debug)    |
+| `ENVIRONMENT`                | ❌       | `production`            | Environment (development/production)        |
+| `DISCORD_DEFAULT_USERNAME`   | ❌       | `Reddit Bot`            | Custom webhook username                     |
+| `DISCORD_DEFAULT_AVATAR_URL` | ❌       | -                       | Custom webhook avatar URL                   |
+| `DISCORD_ENABLE_THREADING`   | ❌       | `false`                 | Enable Discord thread creation              |
+| `DISCORD_FORUM_CHANNEL`      | ❌       | `false`                 | Whether Discord channel is a forum          |
+| `HEALTH_CHECK_PORT`          | ❌       | `3000`                  | Port for health check endpoint              |
+| `STORAGE_FILE_PATH`          | ❌       | `data/posted-ids.json`  | Path to post IDs storage file               |
 
 ## 🐳 Docker Deployment
 
@@ -208,17 +218,21 @@ SCHEDULE_TIMEZONE=Australia/Hobart
 # Build the image
 docker build -t tassie-reddit-bot .
 
-# Run with environment file
+# Run with environment file and persistent volumes
 docker run -d \
   --name tassie-bot \
   --env-file .env \
   -v $(pwd)/data:/app/data \
   -v $(pwd)/logs:/app/logs \
   -p 3000:3000 \
+  --restart unless-stopped \
   tassie-reddit-bot
 
 # View logs
 docker logs -f tassie-bot
+
+# Stop and remove container
+docker stop tassie-bot && docker rm tassie-bot
 ```
 
 ## ☁️ Coolify Deployment
@@ -301,44 +315,50 @@ NODE_ENV=production
 
 #### 5. Configure Persistent Storage
 
-1. **Add Volumes** (in Storage section):
-   - **Data Volume**:
-     - Path: `/app/data`
-     - Purpose: Stores processed post IDs
-   - **Logs Volume**:
-     - Path: `/app/logs`
-     - Purpose: Application logs
+The bot requires persistent storage for post tracking and logs. In Coolify, configure volumes in the **Storage** section:
 
-2. **Volume Configuration**:
-   ```yaml
-   /app/data -> ./data (persistent)
-   /app/logs -> ./logs (persistent)
-   ```
+1. **Data Volume** (required):
+   - **Volume Name**: `tassie-bot-data`
+   - **Source Path**: `/data` (on host)
+   - **Destination Path**: `/app/data` (in container)
+   - **Purpose**: Stores processed post IDs and OAuth tokens
+
+2. **Logs Volume** (optional):
+   - **Volume Name**: `tassie-bot-logs`
+   - **Source Path**: `/logs` (on host)
+   - **Destination Path**: `/app/logs` (in container)
+   - **Purpose**: Application logs with rotation
+
+**Important**: The container expects data at `/app/data`, so ensure the destination path is exactly `/app/data` in your Coolify volume configuration.
 
 #### 6. OAuth2 Setup for Production
 
 **⚠️ Critical**: OAuth2 requires special setup for production deployment. You have two options:
 
-##### Option A: Manual Token Setup (Recommended for Security)
+##### Option A: Use Helper Script (Requires Separate Reddit App)
 
-1. **Set up OAuth2 locally first**:
+⚠️ **Important**: This option requires creating a separate Reddit app for local development since Reddit apps are tied to specific redirect URIs.
+
+1. **Create a separate Reddit app for local setup**:
+   - Go to [Reddit App Preferences](https://www.reddit.com/prefs/apps)
+   - Create another app with redirect URI: `http://localhost:8080/auth/callback`
+   - Use different credentials for local OAuth2 setup
+
+2. **Run local OAuth2 setup**:
 
    ```bash
-   # On your local machine
-   git clone https://github.com/your-username/tassie-reddit-bot.git
-   cd tassie-reddit-bot
-   npm install
-   cp .env.example .env
-   # Edit .env with your credentials and REDDIT_REDIRECT_URI=http://localhost:8080/auth/callback
-   npm run setup:oauth
+   # Use the LOCAL app credentials temporarily
+   REDDIT_CLIENT_ID=local_app_client_id \
+   REDDIT_CLIENT_SECRET=local_app_client_secret \
+   REDDIT_REDIRECT_URI=http://localhost:8080/auth/callback \
+   node scripts/setup-oauth.js
    ```
 
-2. **Copy tokens to production**:
-   - After local OAuth2 setup, find the tokens file: `data/reddit-tokens.json`
-   - Copy the `refreshToken` value from this file
-   - In Coolify, add environment variable:
+3. **Copy refresh token to production**:
+   - Copy the refresh token from the setup output
+   - In Coolify, add environment variable with your **production** app credentials:
      ```env
-     REDDIT_REFRESH_TOKEN=your_refresh_token_from_local_setup
+     REDDIT_REFRESH_TOKEN=refresh_token_from_local_setup
      ```
 
 ##### Option B: Direct Production OAuth2 Flow
@@ -377,10 +397,10 @@ NODE_ENV=production
 
 ##### Which Option to Choose?
 
-- **Option A**: More secure, requires local development setup
-- **Option B**: Easier for production-only deployments, uses the built-in callback handler
+- **Option A**: Requires creating separate Reddit apps for local/production
+- **Option B**: **Recommended** - Uses single Reddit app, simpler setup, built-in callback handler
 
-> **💡 Production Tip**: Option B is now the recommended approach for Coolify deployments since the bot handles the OAuth2 callback automatically.
+> **💡 Production Tip**: Option B is the recommended approach for Coolify deployments since it uses your production Reddit app directly and the bot handles the OAuth2 callback automatically. No need for separate apps or local development setup.
 
 #### 7. Health Check Configuration
 
@@ -657,19 +677,22 @@ The project uses strict code quality tools:
 
 #### Reddit API Issues
 
-**Problem**: `401 Unauthorized` errors  
+**Problem**: `401 Unauthorized` or OAuth2 errors  
 **Solution**:
 
-- Verify Reddit credentials in `.env`
-- Check that Reddit app is configured as "script" type
-- Ensure username/password are correct
+- Verify Reddit credentials in `.env` (client ID, client secret)
+- Check that Reddit app is configured as **"web app"** type (not "script")
+- Ensure `REDDIT_REDIRECT_URI` matches exactly what's configured in Reddit app
+- Run OAuth2 setup: `npm run setup:oauth` or use fresh authorization code
+- Check that `REDDIT_REFRESH_TOKEN` is valid (not expired)
 
 **Problem**: `429 Rate Limited` errors  
 **Solution**:
 
-- Reduce `REDDIT_POST_LIMIT` value
-- Increase cron interval (less frequent checks)
+- Reduce `REDDIT_POST_LIMIT` value (try 10-15 instead of 25)
+- Increase cron interval (use `*/30 * * * *` for 30-minute intervals)
 - Check for multiple bot instances running
+- Verify OAuth2 tokens are not shared between instances
 
 #### Discord Webhook Issues
 
